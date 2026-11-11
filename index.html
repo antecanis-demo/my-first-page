@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1c2a4a">
+<title>宴会仕込み量・発注締切 計算機</title>
+<style>
+  :root{
+    --sumi:#15181f; --ink:#1c2a4a; --ink-2:#2f4372;
+    --shu:#c0392b; --shu-soft:#e0674f; --kin:#b9902f;
+    --washi:#f4efe4; --line:#cdc3ad;
+    --ok:#2e7d5b; --warn:#c07a1e; --danger:#b03a2e;
+    --radius:14px;
+    --shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 24px -18px rgba(28,42,74,.55);
+    font-size:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP","Times New Roman",serif;
+    color:var(--sumi);
+    background-color:var(--washi);
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(185,144,47,.10), transparent 42%),
+      radial-gradient(circle at 88% 2%, rgba(192,57,43,.08), transparent 38%),
+      repeating-linear-gradient(0deg, rgba(28,42,74,.028) 0 1px, transparent 1px 4px),
+      repeating-linear-gradient(90deg, rgba(28,42,74,.028) 0 1px, transparent 1px 4px);
+    line-height:1.7;
+    -webkit-text-size-adjust:100%;
+    padding:0 0 env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:18px 16px 64px}
+  header.masthead{
+    position:relative;
+    background:linear-gradient(150deg,var(--ink) 0%, var(--ink-2) 100%);
+    color:#f6f1e6; border-radius:var(--radius);
+    padding:26px 22px 22px; overflow:hidden; box-shadow:var(--shadow);
+  }
+  header.masthead::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(45deg, rgba(255,255,255,.035) 0 2px, transparent 2px 7px);
+    mix-blend-mode:screen;
+  }
+  .kicker{
+    display:inline-block;font-size:.72rem;letter-spacing:.28em;
+    color:#e8d9a8;border:1px solid rgba(232,217,168,.5);
+    padding:3px 12px;border-radius:999px;margin-bottom:12px;
+  }
+  header.masthead h1{
+    font-size:clamp(1.5rem,5vw,2.15rem);margin:.1em 0 .35em;line-height:1.3;
+    font-weight:600;letter-spacing:.04em;
+  }
+  header.masthead h1 .accent{color:#f0c14b}
+  header.masthead p{margin:0;font-size:.92rem;color:#d7dce8;max-width:52ch}
+  .seal{
+    position:absolute;top:14px;right:14px;width:58px;height:58px;
+    border:2px solid var(--shu-soft);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    color:#f0b7a6;font-size:.62rem;letter-spacing:.18em;line-height:1.25;
+    background:rgba(192,57,43,.16);transform:rotate(3deg);
+  }
+  .seal b{font-size:1.05rem;letter-spacing:.05em;color:#f6d3c6}
+  main{display:grid;gap:16px;margin-top:16px}
+  section.card{
+    background:linear-gradient(180deg,#fffdf8, var(--washi));
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 16px;box-shadow:var(--shadow);
+  }
+  section.card > h2{
+    font-size:1.02rem;margin:0 0 14px;letter-spacing:.06em;
+    display:flex;align-items:center;gap:9px;font-weight:600;
+  }
+  section.card > h2::before{
+    content:"";width:6px;height:20px;border-radius:2px;
+    background:linear-gradient(var(--shu),var(--kin));flex:none;
+  }
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .field > label,.lbl{
+    font-size:.82rem;font-weight:600;letter-spacing:.05em;color:var(--ink);
+    display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  }
+  .hint{font-size:.74rem;color:#7a7460;font-weight:400}
+  input[type=date],input[type=number],select{
+    font:inherit;font-size:1rem;padding:11px 12px;border-radius:10px;
+    border:1px solid var(--line);background:#fffefb;color:var(--sumi);
+    width:100%;min-height:46px;
+  }
+  select{appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);
+    background-position:calc(100% - 20px) 20px,calc(100% - 14px) 20px;
+    background-size:6px 6px,6px 6px;background-repeat:no-repeat;padding-right:38px;
+  }
+  input:focus-visible,select:focus-visible,button:focus-visible{
+    outline:3px solid rgba(47,67,114,.35);outline-offset:2px;
+  }
+  .range-row{display:flex;align-items:center;gap:12px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:transparent}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--ink-2),var(--shu-soft))}
+  input[type=range]::-moz-range-track{height:8px;border-radius:99px;background:linear-gradient(90deg,var(--ink-2),var(--shu-soft))}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:30px;height:30px;margin-top:-11px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff,#f0e6d2 60%,#d9cdb2);
+    border:2px solid var(--ink);box-shadow:0 3px 8px -3px rgba(0,0,0,.5);cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:28px;height:28px;border-radius:50%;border:2px solid var(--ink);
+    background:radial-gradient(circle at 35% 30%,#fff,#f0e6d2 60%,#d9cdb2);cursor:pointer;
+  }
+  .num-badge{font-variant-numeric:tabular-nums;font-size:1.5rem;font-weight:700;color:var(--ink);min-width:4.2ch;text-align:right}
+  .num-badge small{font-size:.7rem;color:#7a7460;font-weight:400;margin-left:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    position:relative;border:1px solid var(--line);border-radius:10px;background:#fffefb;
+    padding:10px 14px;cursor:pointer;user-select:none;font-size:.9rem;min-height:44px;
+    display:inline-flex;align-items:center;gap:7px;transition:transform .12s ease, box-shadow .12s ease, background .12s;
+  }
+  .chip input{position:absolute;opacity:0;pointer-events:none}
+  .chip:hover{transform:translateY(-1px)}
+  .chip:has(input:checked){
+    background:linear-gradient(180deg,#22335c,#1a2743);color:#f4efe4;border-color:var(--ink);
+    box-shadow:0 8px 16px -12px rgba(21,24,31,.9);
+  }
+  .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--kin);flex:none}
+  .chip:has(input:checked) .dot{background:#f0c14b}
+  .chip em{font-style:normal;font-size:.74rem;opacity:.75}
+  .switch{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--line);
+    border-radius:10px;background:#fffefb;cursor:pointer;min-height:46px;position:relative}
+  .switch input{position:absolute;opacity:0;pointer-events:none}
+  .switch .track{width:46px;height:26px;border-radius:99px;background:#d9cfb9;position:relative;flex:none;transition:background .18s}
+  .switch .track::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .18s}
+  .switch input:checked + .track{background:var(--ok)}
+  .switch input:checked + .track::after{transform:translateX(20px)}
+  .switch .txt{font-size:.9rem;font-weight:600}
+  .switch .txt small{display:block;font-weight:400;color:#7a7460;font-size:.74rem}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+  button{
+    font:inherit;font-size:.92rem;font-weight:600;letter-spacing:.04em;cursor:pointer;
+    border-radius:10px;padding:12px 18px;min-height:46px;border:1px solid transparent;
+    transition:transform .12s ease, box-shadow .12s ease, filter .12s;
+  }
+  button:active{transform:translateY(1px)}
+  .btn-primary{background:linear-gradient(180deg,#26375e,#1a2743);color:#f6f1e6;box-shadow:0 10px 20px -14px rgba(21,24,31,.95)}
+  .btn-ghost{background:#fffefb;border-color:var(--line);color:var(--ink)}
+  .btn-shu{background:linear-gradient(180deg,var(--shu-soft),var(--shu));color:#fff}
+  button:hover{filter:brightness(1.05)}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{background:#fffefb;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stat .k{font-size:.72rem;letter-spacing:.08em;color:#7a7460}
+  .stat .v{font-size:1.25rem;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:2px}
+  .stat .v small{font-size:.72rem;color:#7a7460;font-weight:400}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--line)}
+  table{border-collapse:collapse;width:100%;min-width:520px;background:#fffefb}
+  th,td{padding:11px 12px;text-align:left;border-bottom:1px solid #e6ddc9;font-size:.9rem}
+  thead th{
+    background:linear-gradient(180deg,#22335c,#1a2743);color:#f0e9da;font-weight:600;
+    letter-spacing:.04em;position:sticky;top:0;font-size:.82rem;
+  }
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#faf6ec}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  td .unit{font-size:.72rem;color:#7a7460;font-weight:400}
+  .sup-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  .sup-a{background:#2f4372}.sup-b{background:var(--ok)}.sup-c{background:var(--kin)}
+  .deadlines{display:grid;gap:12px}
+  .dl{
+    display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;
+    background:#fffefb;border:1px solid var(--line);border-left:5px solid var(--ink-2);
+    border-radius:12px;padding:13px 14px;
+  }
+  .dl.warn{border-left-color:var(--warn);background:#fffaf0}
+  .dl.danger{border-left-color:var(--danger);background:#fdf3f1}
+  .dl.ok{border-left-color:var(--ok)}
+  .dl .name{font-weight:700;color:var(--ink)}
+  .dl .meta{font-size:.78rem;color:#7a7460}
+  .dl .when{text-align:right;font-variant-numeric:tabular-nums}
+  .dl .when .date{font-weight:700;font-size:1.02rem;color:var(--ink)}
+  .badge{display:inline-block;font-size:.74rem;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.05em;margin-top:3px}
+  .badge.ok{background:#e3f1ea;color:var(--ok)}
+  .badge.warn{background:#f8ecd6;color:#9a6212}
+  .badge.danger{background:#f9dfda;color:var(--danger)}
+  .note{margin-top:12px;font-size:.8rem;color:#6d6754;background:#f6f1e3;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);
+    background:var(--ink);color:#f6f1e6;padding:11px 20px;border-radius:999px;
+    font-size:.86rem;opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;z-index:50;
+    box-shadow:0 14px 30px -16px rgba(0,0,0,.8);
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  footer.foot{margin-top:22px;text-align:center;font-size:.76rem;color:#8a836d}
+  .fade-in{animation:fade .5s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (max-width:640px){
+    .grid2{grid-template-columns:1fr}
+    .summary{grid-template-columns:1fr}
+    .dl{grid-template-columns:1fr auto}
+    .dl .name{grid-column:1 / -1}
+    .seal{width:48px;height:48px;font-size:.54rem}
+    header.masthead{padding:22px 16px}
+  }
+  @media print{
+    body{background:#fff}
+    header.masthead{background:#1a2743 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .actions,.toast{display:none !important}
+    section.card{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="seal"><b>献立</b>仕込み</div>
+    <span class="kicker">宴会・団体予約 対応</span>
+    <h1>宴会の<span class="accent">仕込み量</span>と<br><span class="accent">発注の締め切り</span>を、まとめて計算。</h1>
+    <p>人数とコースを選ぶだけ。食材ごとの仕込み量の目安と、卸ごとの発注締切日・残り日数がその場で分かります。</p>
+  </header>
+
+  <main>
+    <section class="card fade-in" style="animation-delay:.05s">
+      <h2>宴会の内容を入力</h2>
+      <div class="grid2">
+        <div class="field">
+          <label for="banquetDate">宴会の日付 <span class="hint">発注締切の基準</span></label>
+          <input type="date" id="banquetDate">
+        </div>
+        <div class="field">
+          <label for="startTime">開始時刻</label>
+          <select id="startTime">
+            <option value="11:30">11:30 昼宴会</option>
+            <option value="12:00">12:00 昼宴会</option>
+            <option value="17:30">17:30 夜宴会</option>
+            <option value="18:00" selected>18:00 夜宴会</option>
+            <option value="19:00">19:00 夜宴会</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px">
+        <label for="people">人数 <span class="hint">1〜120名</span></label>
+        <div class="range-row">
+          <input type="range" id="peopleRange" min="1" max="120" value="20" step="1" aria-label="人数スライダー">
+          <input type="number" id="people" min="1" max="120" value="20" inputmode="numeric" style="width:6.5em">
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px">
+        <span class="lbl">料理ジャンル</span>
+        <div class="chips" id="cuisineChips">
+          <label class="chip"><input type="radio" name="cuisine" value="washoku" checked><span class="dot"></span>和食会席 <em>仕出し・法事</em></label>
+          <label class="chip"><input type="radio" name="cuisine" value="yoshoku"><span class="dot"></span>洋食 <em>コース・パーティ</em></label>
+          <label class="chip"><input type="radio" name="cuisine" value="chuka"><span class="dot"></span>中華 <em>円卓</em></label>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px">
+        <span class="lbl">コースのグレード <span class="hint">食材量の係数</span></span>
+        <div class="chips" id="gradeChips">
+          <label class="chip"><input type="radio" name="grade" value="ume"><span class="dot"></span>梅 <em>標準 ×1.00</em></label>
+          <label class="chip"><input type="radio" name="grade" value="take" checked><span class="dot"></span>竹 <em>中位 ×1.20</em></label>
+          <label class="chip"><input type="radio" name="grade" value="matsu"><span class="dot"></span>松 <em>上等 ×1.45</em></label>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px">
+        <label for="loss">仕込みロス率 <span class="hint">下処理・歩留まりの余裕</span></label>
+        <div class="range-row">
+          <input type="range" id="lossRange" min="0" max="30" value="10" step="1" aria-label="ロス率スライダー">
+          <span class="num-badge" id="lossOut">10<small>%</small></span>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:grid;gap:10px">
+        <label class="switch">
+          <input type="checkbox" id="weekendSkip" checked>
+          <span class="track"></span>
+          <span class="txt">土日を挟まないで締切を計算<small>卸の営業日に合わせる（ON推奨）</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="showA" checked>
+          <span class="track"></span>
+          <span class="txt">卸A（鮮魚・精肉）を表示<small>リードタイム 3営業日</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="showB" checked>
+          <span class="track"></span>
+          <span class="txt">卸B（青果）を表示<small>リードタイム 2営業日</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="showC" checked>
+          <span class="track"></span>
+          <span class="txt">卸C（乾物・調味料）を表示<small>リードタイム 1営業日</small></span>
+        </label>
+      </div>
+
+      <div class="actions" style="margin-top:16px">
+        <button type="button" class="btn-primary" id="calcBtn">計算する</button>
+        <button type="button" class="btn-shu" id="copyBtn">結果をコピー</button>
+        <button type="button" class="btn-ghost" id="resetBtn">リセット</button>
+        <button type="button" class="btn-ghost" id="printBtn">印刷 / PDF保存</button>
+      </div>
+    </section>
+
+    <section class="card fade-in" id="resultCard" style="animation-delay:.1s">
+      <h2>計算結果</h2>
+      <div class="summary" id="summary"></div>
+
+      <h2 style="margin-top:22px">食材ごとの仕込み量の目安</h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>食材</th>
+              <th>卸</th>
+              <th style="text-align:right">総仕込み量</th>
+              <th style="text-align:right">1人前</th>
+            </tr>
+          </thead>
+          <tbody id="ingBody"></tbody>
+        </table>
+      </div>
+      <p class="note" id="ingNote"></p>
+
+      <h2 style="margin-top:22px">卸への発注の締め切り</h2>
+      <div class="deadlines" id="deadlineList"></div>
+      <p class="note">締切日は、宴会当日の朝に仕込みが間に合うよう「前日納品」を前提に逆算しています。土日を挟む場合は余裕を持って発注してください。</p>
+    </section>
+  </main>
+
+  <footer class="foot">宴会仕込み量・発注締切 計算機 — すべてブラウザ内で計算します（外部通信なし）</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- データ定義 ---------- */
+  var CUISINE = {
+    washoku:{label:"和食会席", note:"和食は出汁・椀物の歩留まりを多めに見ます。"},
+    yoshoku:{label:"洋食",    note:"洋食はソース・付け合わせの分量を含みます。"},
+    chuka:  {label:"中華",    note:"中華は円卓での取り分けを前提にした量です。"}
+  };
+
+  // 1人前あたりの基準量。sup: A=鮮魚精肉, B=青果, C=乾物調味料
+  var INGREDIENTS = [
+    {id:"fish",   name:"鮮魚（刺身・焼物）", unit:"g",  sup:"A", base:{washoku:120, yoshoku:80,  chuka:90},  round:50},
+    {id:"meat",   name:"精肉（焼物・煮物）", unit:"g",  sup:"A", base:{washoku:90,  yoshoku:130, chuka:110}, round:50},
+    {id:"rice",   name:"米（酢飯・飯物）",   unit:"g",  sup:"C", base:{washoku:150, yoshoku:100, chuka:120}, round:100},
+    {id:"veg",    name:"野菜（付け合わせ）", unit:"g",  sup:"B", base:{washoku:140, yoshoku:120, chuka:160}, round:50},
+    {id:"tofu",   name:"豆腐・湯葉",         unit:"g",  sup:"C", base:{washoku:80,  yoshoku:40,  chuka:50},  round:50},
+    {id:"dashi",  name:"出汁・スープ",       unit:"ml", sup:"C", base:{washoku:180, yoshoku:150, chuka:170}, round:100},
+    {id:"season", name:"薬味・調味料",       unit:"g",  sup:"C", base:{washoku:25,  yoshoku:30,  chuka:35},  round:10},
+    {id:"dessert",name:"デザート・果物",     unit:"g",  sup:"B", base:{washoku:60,  yoshoku:80,  chuka:70},  round:50}
+  ];
+
+  var GRADES = {
+    ume:  {label:"梅", factor:1.00},
+    take: {label:"竹", factor:1.20},
+    matsu:{label:"松", factor:1.45}
+  };
+
+  // 卸: リードタイム（営業日）と品目
+  var SUPPLIERS = {
+    A:{label:"卸A（鮮魚・精肉）", lead:3, item:"鮮魚・精肉"},
+    B:{label:"卸B（青果）",       lead:2, item:"野菜・果物"},
+    C:{label:"卸C（乾物・調味料）", lead:1, item:"米・乾物・調味料"}
+  };
+
+  /* ---------- DOM ---------- */
+  var $ = function(id){ return document.getElementById(id); };
+  var banquetDate = $("banquetDate"), startTime = $("startTime");
+  var people = $("people"), peopleRange = $("peopleRange");
+  var lossRange = $("lossRange"), lossOut = $("lossOut");
+  var weekendSkip = $("weekendSkip");
+  var showA = $("showA"), showB = $("showB"), showC = $("showC");
+  var summary = $("summary"), ingBody = $("ingBody"), ingNote = $("ingNote");
+  var deadlineList = $("deadlineList"), toast = $("toast");
+  var resultCard = $("resultCard");
+
+  /* ---------- ユーティリティ ---------- */
+  function pad(n){ return (n<10?"0":"")+n; }
+  function ymd(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function fmtJP(d){ return (d.getMonth()+1)+"月"+d.getDate()+"日"; }
+  function dayName(d){ return ["日","月","火","水","木","金","土"][d.getDay()]; }
+  function roundTo(v, step){ return Math.max(step, Math.round(v/step)*step); }
+  function isWeekend(d){ var w=d.getDay(); return w===0||w===6; }
+  function addDays(d, n){ var x=new Date(d.getTime()); x.setDate(x.getDate()+n); return x; }
+  function minusBusinessDays(from, n){
+    var d = new Date(from.getTime());
+    var count = 0;
+    while(count < n){
+      d = addDays(d, -1);
+      if(!isWeekend(d)) count++;
+    }
+    return d;
+  }
+  function minusCalendarDays(from, n){ return addDays(from, -n); }
+  function today0(){
+    var t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }
+  function daysBetween(a,b){ return Math.round((b - a) / 86400000); }
+  function toastMsg(msg){
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ toast.classList.remove("show"); }, 1900);
+  }
+
+  /* ---------- 状態の読み取り ---------- */
+  function getRadio(name){
+    var el = document.querySelector('input[name="'+name+'"]:checked');
+    return el ? el.value : null;
+  }
+  function clampPeople(v){
+    v = parseInt(v, 10);
+    if(isNaN(v)) v = 1;
+    return Math.min(120, Math.max(1, v));
+  }
+
+  /* ---------- 計算本体 ---------- */
+  function compute(){
+    var n = clampPeople(people.value);
+    var cuisine = getRadio("cuisine") || "washoku";
+    var grade = getRadio("grade") || "take";
+    var loss = parseInt(lossRange.value, 10) || 0;
+    var factor = GRADES[grade].factor;
+    var lossF = 1 + loss/100;
+
+    var rows = INGREDIENTS.map(function(ing){
+      var perHead = ing.base[cuisine] * factor;
+      var totalRaw = perHead * n * lossF;
+      var total = roundTo(totalRaw, ing.round);
+      return { ing: ing, perHead: Math.round(perHead * 10) / 10, total: total };
+    });
+    return {n:n, cuisine:cuisine, grade:grade, loss:loss, rows:rows};
+  }
+
+  function render(){
+    var r = compute();
+    var dateStr = banquetDate.value ? fmtJP(new Date(banquetDate.value+"T00:00:00")) : "未設定";
+    summary.innerHTML =
+      '<div class="stat"><div class="k">宴会日</div><div class="v">'+dateStr+' <small>'+startTime.value+'</small></div></div>'+
+      '<div class="stat"><div class="k">人数 × コース</div><div class="v">'+r.n+' <small>名 / '+CUISINE[r.cuisine].label+'・'+GRADES[r.grade].label+'</small></div></div>'+
+      '<div class="stat"><div class="k">最短の発注締切</div><div class="v" id="soonest">—</div></div>';
+
+    var html = "";
+    r.rows.forEach(function(row){
+      html += '<tr>'+
+        '<td>'+row.ing.name+'</td>'+
+        '<td><span class="sup-dot sup-'+row.ing.sup.toLowerCase()+'"></span>'+row.ing.sup+'</td>'+
+        '<td class="num">'+row.total.toLocaleString('ja-JP')+' <span class="unit">'+row.ing.unit+'</span></td>'+
+        '<td class="num">'+row.perHead.toLocaleString('ja-JP')+' <span class="unit">'+row.ing.unit+'</span></td>'+
+        '</tr>';
+    });
+    ingBody.innerHTML = html;
+    ingNote.textContent = CUISINE[r.cuisine].note + " コース「"+GRADES[r.grade].label+"」（係数 ×"+GRADES[r.grade].factor.toFixed(2)+
+      "）、仕込みロス "+r.loss+"% を見込んだ量です。実際の盛り込みで微調整してください。";
+
+    renderDeadlines(r);
+  }
+
+  function renderDeadlines(r){
+    var base = banquetDate.value ? new Date(banquetDate.value+"T00:00:00") : addDays(today0(), 7);
+    var today = today0();
+    var visible = {A:showA.checked, B:showB.checked, C:showC.checked};
+    var items = [];
+    Object.keys(SUPPLIERS).forEach(function(k){
+      if(!visible[k]) return;
+      var sup = SUPPLIERS[k];
+      var deliver = addDays(base, -1);
+      var deadline = weekendSkip.checked ? minusBusinessDays(deliver, sup.lead) : minusCalendarDays(deliver, sup.lead);
+      items.push({k:k, sup:sup, deadline:deadline, deliver:deliver});
+    });
+    items.sort(function(a,b){ return a.deadline - b.deadline; });
+
+    var soonestTxt = "—";
+    var html = "";
+    items.forEach(function(it, i){
+      var remain = daysBetween(today, it.deadline);
+      var cls = "ok", badge = "あと"+remain+"日";
+      if(remain < 0){ cls="danger"; badge="期限超過"; }
+      else if(remain === 0){ cls="danger"; badge="本日中"; }
+      else if(remain <= 3){ cls="warn"; }
+      if(i===0){ soonestTxt = fmtJP(it.deadline)+"（"+dayName(it.deadline)+"）／"+badge; }
+      html += '<div class="dl '+cls+'">'+
+        '<div><span class="sup-dot sup-'+it.k.toLowerCase()+'"></span></div>'+
+        '<div>'+
+          '<div class="name">'+it.sup.label+'</div>'+
+          '<div class="meta">'+it.sup.item+' ／ リードタイム '+it.sup.lead+'営業日 ／ 納品目安 '+fmtJP(it.deliver)+'（'+dayName(it.deliver)+'）</div>'+
+        '</div>'+
+        '<div class="when">'+
+          '<div class="date">'+fmtJP(it.deadline)+'（'+dayName(it.deadline)+'）</div>'+
+          '<span class="badge '+cls+'">'+badge+'</span>'+
+        '</div>'+
+      '</div>';
+    });
+    deadlineList.innerHTML = html || '<p class="note">表示する卸が選ばれていません。</p>';
+    var s = $("soonest");
+    if(s) s.textContent = soonestTxt;
+  }
+
+  /* ---------- テキスト出力 ---------- */
+  function buildText(){
+    var r = compute();
+    var lines = [];
+    lines.push("【宴会 仕込み量・発注締切】");
+    lines.push("宴会日: "+(banquetDate.value || "未設定")+" "+startTime.value);
+    lines.push("人数: "+r.n+"名 ／ ジャンル: "+CUISINE[r.cuisine].label+" ／ コース: "+GRADES[r.grade].label);
+    lines.push("仕込みロス率: "+r.loss+"%");
+    lines.push("");
+    lines.push("■ 食材ごとの仕込み量の目安");
+    r.rows.forEach(function(row){
+      lines.push("- "+row.ing.name+"（卸"+row.ing.sup+"）: "+row.total.toLocaleString('ja-JP')+row.ing.unit+
+        "（1人前 "+row.perHead+row.ing.unit+"）");
+    });
+    lines.push("");
+    lines.push("■ 卸への発注の締め切り");
+    var base = banquetDate.value ? new Date(banquetDate.value+"T00:00:00") : addDays(today0(),7);
+    Object.keys(SUPPLIERS).forEach(function(k){
+      var sup = SUPPLIERS[k];
+      var deliver = addDays(base,-1);
+      var deadline = weekendSkip.checked ? minusBusinessDays(deliver,sup.lead) : minusCalendarDays(deliver,sup.lead);
+      lines.push("- "+sup.label+": "+ymd(deadline)+"（"+dayName(deadline)+"）まで ／ 納品目安 "+ymd(deliver));
+    });
+    lines.push("");
+    lines.push("※ 目安です。実際の盛り込み・卸の営業日で微調整してください。");
+    return lines.join("\n");
+  }
+
+  function fallbackCopy(text, done){
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly","");
+    ta.style.position="fixed"; ta.style.top="-1000px";
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand("copy"); done(); }
+    catch(e){ toastMsg("コピーできませんでした"); }
+    document.body.removeChild(ta);
+  }
+  function copyText(){
+    var text = buildText();
+    var done = function(){ toastMsg("結果をコピーしました"); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+
+  /* ---------- イベント ---------- */
+  function syncPeopleFromRange(){ people.value = peopleRange.value; render(); }
+  function syncRangeFromPeople(){ peopleRange.value = clampPeople(people.value); people.value = peopleRange.value; render(); }
+
+  peopleRange.addEventListener("input", syncPeopleFromRange);
+  people.addEventListener("input", syncRangeFromPeople);
+  people.addEventListener("blur", syncRangeFromPeople);
+
+  lossRange.addEventListener("input", function(){
+    lossOut.innerHTML = lossRange.value + '<small>%</small>';
+    render();
+  });
+
+  [banquetDate, startTime, weekendSkip, showA, showB, showC].forEach(function(el){
+    el.addEventListener("change", render);
+  });
+  document.querySelectorAll('input[name="cuisine"], input[name="grade"]').forEach(function(el){
+    el.addEventListener("change", render);
+  });
+
+  $("calcBtn").addEventListener("click", function(){
+    render();
+    resultCard.scrollIntoView({behavior:"smooth", block:"start"});
+    toastMsg("計算しました");
+  });
+  $("copyBtn").addEventListener("click", copyText);
+  $("printBtn").addEventListener("click", function(){ window.print(); });
+  $("resetBtn").addEventListener("click", function(){
+    banquetDate.value = ymd(addDays(today0(), 14));
+    startTime.value = "18:00";
+    people.value = 20; peopleRange.value = 20;
+    lossRange.value = 10; lossOut.innerHTML = '10<small>%</small>';
+    document.querySelector('input[name="cuisine"][value="washoku"]').checked = true;
+    document.querySelector('input[name="grade"][value="take"]').checked = true;
+    weekendSkip.checked = true; showA.checked = true; showB.checked = true; showC.checked = true;
+    render();
+    toastMsg("初期値に戻しました");
+  });
+
+  /* ---------- 初期化 ---------- */
+  banquetDate.value = ymd(addDays(today0(), 14));
+  render();
+})();
+</script>
+</body>
+</html>
