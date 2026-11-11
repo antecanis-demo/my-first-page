@@ -61,11 +61,11 @@
     background:rgba(192,57,43,.16);transform:rotate(3deg);
   }
   .seal b{font-size:1.05rem;letter-spacing:.05em;color:#f6d3c6}
-  main{display:grid;gap:16px;margin-top:16px}
+  main{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:16px}
   section.card{
     background:linear-gradient(180deg,#fffdf8, var(--washi));
     border:1px solid var(--line);border-radius:var(--radius);
-    padding:18px 16px;box-shadow:var(--shadow);
+    padding:18px 16px;box-shadow:var(--shadow);min-width:0;
   }
   section.card > h2{
     font-size:1.02rem;margin:0 0 14px;letter-spacing:.06em;
